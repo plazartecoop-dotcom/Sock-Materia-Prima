@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Stock Materia Prima — Plaza R-T</title>
+<style>
+  :root{
+    --bg:#14181a; --panel:#1d2326; --panel-2:#242b2f; --line:#313a3f;
+    --text:#e9ebe8; --muted:#8d9aa0;
+    --ok:#3ec97a; --ok-bg:#3ec97a; --ok-text:#1a1a1a;
+    --warn:#f0b429; --warn-bg:#f0b429; --warn-text:#1a1a1a;
+    --bad:#ff6b5b; --bad-bg:#c0392b; --bad-text:#ffffff;
+    --accent:#e0c14a;
+    --mono:'Courier New', monospace; --sans:Arial, sans-serif;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
+  .app{ max-width:1100px; margin:0 auto; padding:14px 12px 80px; }
+
+  /* ===== Header ===== */
+  header.top{
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom:2px solid var(--line); padding-bottom:12px; margin-bottom:14px; flex-wrap:wrap; gap:8px;
+  }
+  header.top .id{ font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+  header.top h1{ margin:2px 0 0; font-size:20px; font-weight:700; }
+  .conn-status{ font-family:var(--mono); font-size:11px; padding:4px 8px; border-radius:3px; }
+  .conn-status.on{ background:var(--ok-bg); color:var(--ok-text); }
+  .conn-status.off{ background:var(--bad-bg); color:var(--bad-text); }
+
+  /* ===== Tabs ===== */
+  .tabs{ display:flex; gap:2px; margin-bottom:18px; border:1px solid var(--line); overflow-x:auto; }
+  .tab{
+    font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.03em;
+    padding:10px 12px; color:var(--muted); cursor:pointer; background:var(--panel);
+    border-right:1px solid var(--line); white-space:nowrap; flex-shrink:0;
+    display:flex; align-items:center; gap:6px;
+  }
+  .tab:last-child{ border-right:none; }
+  .tab.active{ background:var(--accent); color:#1a1a1a; font-weight:700; }
+  .tab .badge{ background:var(--bad); color:#fff; font-size:10px; font-weight:700; border-radius:8px; min-width:15px; height:15px; display:flex; align-items:center; justify-content:center; padding:0 3px; }
+  .tab.active .badge{ background:#1a1a1a; color:#fff; }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* ===== Summary bar ===== */
+  .summary-bar{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-bottom:18px; }
+  .summary-bar .cell{ background:var(--panel); padding:10px 12px; }
+  .summary-bar .cell .n{ font-family:var(--mono); font-size:20px; font-weight:700; }
+  .summary-bar .cell .l{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:1px;}
+  .summary-bar .cell.alert .n{ color:var(--bad); }
+
+  /* ===== Stock table ===== */
+  .stock-list{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); margin-bottom:20px; }
+  .stock-row{ background:var(--panel); display:grid; grid-template-columns:5px minmax(120px,1fr) 200px 40px 120px; gap:14px; align-items:center; padding:10px 10px; cursor:pointer; }
+  .stock-row:active{ background:var(--panel-2); }
+  .row-flag{ width:5px; height:38px; border-radius:2px; }
+  .row-flag.ok{ background:var(--ok); }
+  .row-flag.warn{ background:var(--warn); }
+  .row-flag.bad{ background:var(--bad); }
+  .stock-row .name{ font-weight:700; font-size:14px; line-height:1.25; }
+  .stock-row .name .sub{ display:block; font-size:10.5px; color:var(--muted); font-weight:400; margin-top:2px; }
+  .occ-block{ }
+  .occ-top{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; margin-bottom:3px; }
+  .occ-top .tn{ font-weight:700; }
+  .occ-top .cap{ color:var(--muted); font-size:10px; }
+  .occ-track{ width:100%; height:6px; background:var(--panel-2); border-radius:3px; overflow:hidden; border:1px solid var(--line); }
+  .occ-fill{ height:100%; }
+  .occ-fill.ok{ background:var(--ok); }
+  .occ-fill.warn{ background:var(--warn); }
+  .occ-fill.bad{ background:var(--bad); }
+  .occ-pct{ font-family:var(--mono); font-size:10px; color:var(--muted); text-align:right; margin-top:2px; }
+  .stock-row .diff{ font-family:var(--mono); font-size:12.5px; text-align:right; }
+  .fis-block{ text-align:right; }
+  .fis-block .fis-label{ font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:3px; }
+  .fis-block .fis-val{ font-family:var(--mono); font-size:16px; font-weight:700; }
+  .fis-block .fis-val.sintoma{ font-size:12px; font-weight:600; color:var(--muted); font-family:var(--sans); }
+  .diff.neg{ color:var(--bad); }
+  .diff.pos{ color:var(--warn); }
+  .diff.zero{ color:var(--ok); }
+  .stock-row .pill{
+    font-family:var(--mono); font-size:10px; font-weight:700; padding:3px 7px; border-radius:3px;
+    display:inline-flex; align-items:center; gap:4px; white-space:nowrap;
+  }
+  .pill.ok{ background:var(--ok-bg); color:var(--ok-text); }
+  .pill.warn{ background:var(--warn-bg); color:var(--warn-text); }
+  .pill.bad{ background:var(--bad-bg); color:var(--bad-text); }
+  .pill .dot{ width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+  @media (max-width: 600px){
+    .stock-row{ grid-template-columns:4px 1fr 1fr; grid-template-rows:auto auto; gap:6px 8px; }
+    .stock-row .name{ grid-column:2 / -1; grid-row:1; }
+    .occ-block{ grid-column:2; grid-row:2; }
+    .fis-block{ grid-column:3; grid-row:2; }
+  }
+
+  /* ===== Panels / forms ===== */
+  .panel{ background:var(--panel); border:1px solid var(--line); padding:16px; margin-bottom:18px; }
+  .panel h2{ margin:0 0 4px; font-size:16px; }
+  .panel .sub{ font-size:12px; color:var(--muted); margin-bottom:16px; }
+
+  .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .form-row.three{ grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:600px){ .form-row, .form-row.three{ grid-template-columns:1fr; } }
+  .field{ display:flex; flex-direction:column; gap:5px; }
+  .field label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
+  .field select, .field input, .field textarea{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    padding:10px 11px; font-family:var(--sans); font-size:15px; border-radius:3px; width:100%;
+  }
+  .field input[type=number]{ font-family:var(--mono); }
+  .field select:focus, .field input:focus, .field textarea:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .btn{ font-family:var(--sans); font-size:13px; font-weight:600; padding:11px 16px; border-radius:3px; border:1px solid var(--line); background:transparent; color:var(--text); cursor:pointer; }
+  .btn.primary{ background:var(--accent); color:#1a1a1a; border-color:var(--accent); }
+  .btn.danger{ background:var(--bad); color:#fff; border-color:var(--bad); }
+  .btn:active{ opacity:.8; }
+  .actions{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:8px; }
+
+  table.simple{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.simple th{ text-align:left; font-size:10.5px; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); padding:7px 8px; }
+  table.simple td{ padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.simple input[type=number]{ width:100px; text-align:right; }
+  table.simple td.prev{ font-family:var(--mono); color:var(--muted); font-size:12px; }
+
+  .recent-list{ border:1px solid var(--line); }
+  .recent-item{ display:grid; grid-template-columns:70px 1fr 90px 60px; gap:8px; padding:9px 11px; border-bottom:1px solid var(--line); font-size:12.5px; align-items:center; }
+  .recent-item:last-child{ border-bottom:none; }
+  .recent-item .time{ font-family:var(--mono); color:var(--muted); font-size:11px; }
+  .recent-item .qty{ font-family:var(--mono); text-align:right; }
+  .recent-item .del{ color:var(--bad); text-align:right; cursor:pointer; font-size:11px; }
+  @media (max-width:600px){ .recent-item{ grid-template-columns:1fr; gap:2px; } }
+
+  /* ===== Detail / modal ===== */
+  .overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:flex-start; justify-content:center; padding:20px 12px; overflow-y:auto; }
+  .overlay.active{ display:flex; }
+  .modal{ background:var(--panel); border:1px solid var(--line); border-top:4px solid var(--accent); max-width:560px; width:100%; padding:20px; margin-top:30px; }
+  .modal.crit{ border-top-color:var(--bad); }
+  .modal h3{ margin:0 0 4px; font-size:17px; }
+  .modal .meta{ font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:14px; }
+  .modal-close{ float:right; font-size:20px; color:var(--muted); cursor:pointer; line-height:1; }
+  .detail-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:14px; }
+  @media (max-width:480px){ .detail-grid{ grid-template-columns:1fr; } }
+  .detail-grid .box .l{ font-size:10px; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+  .detail-grid .box .v{ font-family:var(--mono); font-size:18px; font-weight:700; }
+  .detail-grid .box.diff .v{ color:var(--bad); }
+  .calc-line{ font-family:var(--mono); font-size:11.5px; color:var(--muted); background:var(--panel-2); padding:9px 10px; border-radius:3px; margin-bottom:14px; word-break:break-word; }
+  .calc-line b{ color:var(--text); }
+
+  .hist-item{ display:grid; grid-template-columns:85px 1fr; gap:8px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px; }
+  .hist-item:last-child{ border-bottom:none; }
+  .hist-item .date{ font-family:var(--mono); color:var(--muted); font-size:11px; }
+
+  footer.note{ font-size:11px; color:var(--muted); border-top:1px solid var(--line); padding-top:12px; margin-top:6px; line-height:1.6; }
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ok-bg); color:var(--ok-text); border:1px solid var(--ok); padding:10px 18px; border-radius:4px; font-size:13px; font-weight:600; z-index:100; display:none; }
+  .toast.show{ display:block; }
+  .toast.err{ background:var(--bad-bg); color:var(--bad-text); border-color:var(--bad); }
+
+  .empty-state{ text-align:center; padding:30px 10px; color:var(--muted); font-size:13px; }
+  .config-row{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); gap:10px; flex-wrap:wrap; }
+  .config-row:last-child{ border-bottom:none; }
+  .config-row .name{ font-weight:600; font-size:13px; }
+  .switch{ position:relative; width:42px; height:24px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .switch .slider{ position:absolute; inset:0; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; cursor:pointer; transition:.2s; }
+  .switch .slider:before{ content:""; position:absolute; width:18px; height:18px; left:2px; top:2px; background:var(--muted); border-radius:50%; transition:.2s; }
+  .switch input:checked + .slider{ background:var(--ok-bg); border-color:var(--ok); }
+  .switch input:checked + .slider:before{ transform:translateX(18px); background:var(--ok); }
+  .small-input{ width:60px; text-align:center; padding:6px !important; }
+
+  .print-btn{ font-family:var(--sans); font-size:12px; font-weight:600; padding:8px 14px; border-radius:3px; border:1px solid var(--line); background:var(--panel-2); color:var(--text); cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .print-btn:active{ opacity:.8; }
+  .print-bar{ display:flex; justify-content:flex-end; margin-bottom:10px; }
+  .print-header{ display:none; }
+
+  /* ===== Impresión ===== */
+  @media print{
+    body{ background:#fff; color:#000; }
+    .tabs, .conn-status, header.top .id, .btn, .print-btn, .print-bar, .actions, .toast, .overlay, footer.note{ display:none !important; }
+    .view{ display:none !important; }
+    .view.printing{ display:block !important; }
+    .panel, .stock-list, .stock-row, table.simple, table.simple td, table.simple th{ background:#fff !important; border-color:#999 !important; color:#000 !important; }
+    .stock-row .name, .occ-top .tn, .diff{ color:#000 !important; }
+    .pill{ border:1px solid #000 !important; }
+    .pill.ok{ background:#e8f8ee !important; color:#000 !important; }
+    .pill.warn{ background:#fff6dd !important; color:#000 !important; }
+    .pill.bad{ background:#fde7e4 !important; color:#000 !important; }
+    .occ-track{ border:1px solid #999 !important; background:#eee !important; }
+    .occ-fill{ background:#666 !important; }
+    .row-flag{ background:#666 !important; }
+    .app{ max-width:100%; padding:0; }
+    h1{ font-size:16px; }
+    .print-header{ display:block !important; margin-bottom:14px; font-size:12px; color:#000; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <div class="id">Plaza R-T Cooperativa — Planta Tandil</div>
+      <h1>Stock Materia Prima</h1>
+    </div>
+    <div id="connStatus" class="conn-status off">Conectando...</div>
+  </header>
+
+  <div class="tabs" id="tabsBar">
+    <div class="tab active" data-view="stock">Stock <span class="badge" id="badgeAlert" style="display:none">0</span></div>
+    <div class="tab" data-view="entrada">Entradas</div>
+    <div class="tab" data-view="salida">Salidas</div>
+    <div class="tab" data-view="toma">Toma Física</div>
+    <div class="tab" data-view="historial">Historial</div>
+    <div class="tab" data-view="estadisticas">Estadísticas</div>
+    <div class="tab" data-view="config">Config</div>
+  </div>
+
+  <!-- ============ VISTA: PANEL DE STOCK ============ -->
+  <div class="view active" id="view-stock">
+    <div class="print-bar"><button class="print-btn" onclick="imprimirVista('view-stock','Panel de Stock')">🖶 Imprimir</button></div>
+    <div class="print-header" id="printHeader-stock"></div>
+    <div class="summary-bar">
+      <div class="cell"><div class="n" id="sumTotal">0</div><div class="l">Unidades</div></div>
+      <div class="cell alert"><div class="n" id="sumAlert">0</div><div class="l">Con alerta</div></div>
+      <div class="cell"><div class="n" id="sumOk">0</div><div class="l">En rango</div></div>
+      <div class="cell"><div class="n" id="sumPend">0</div><div class="l">Pend. confirmar</div></div>
+    </div>
+    <div class="stock-list" id="stockList"></div>
+    <footer class="note">Tocá cualquier silo para ver el detalle, el historial y las opciones de recalibración.</footer>
+  </div>
+
+  <!-- ============ VISTA: ENTRADAS ============ -->
+  <div class="view" id="view-entrada">
+    <div class="panel">
+      <h2>Registrar entrada de materia prima</h2>
+      <div class="sub">Un movimiento por camión descargado.</div>
+
+      <div class="form-row three">
+        <div class="field"><label>Fecha</label><input type="date" id="entFecha"></div>
+        <div class="field"><label>Turno</label>
+          <select id="entTurno"><option>Mañana</option><option>Tarde</option><option selected>Noche</option></select>
+        </div>
+        <div class="field"><label>Origen</label>
+          <select id="entOrigen" onchange="toggleOrigenEntrada()">
+            <option value="compra">Compra (pesada)</option>
+            <option value="propia">Producción Propia</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row three" id="entCompraFields">
+        <div class="field"><label>Transporte</label><input type="text" id="entTransporte" placeholder="Ej: CENTENO"></div>
+        <div class="field"><label>Chofer</label><input type="text" id="entChofer" placeholder="Ej: Mainini"></div>
+        <div class="field"><label>N° Remito</label><input type="text" id="entRemito" placeholder="Ej: 15-6744"></div>
+      </div>
+
+      <div class="form-row three">
+        <div class="field"><label>Materia prima / silo</label>
+          <select id="entSilo"></select>
+        </div>
+        <div class="field"><label>Kilogramos</label><input type="number" id="entKg" placeholder="0"></div>
+        <div class="field"><label>Hora</label><input type="time" id="entHora"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="limpiarEntrada()">Limpiar</button>
+        <button class="btn primary" onclick="guardarEntrada()">Guardar entrada</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panelEntradasRecientes">
+      <div class="print-bar"><button class="print-btn" onclick="imprimirVista('view-entrada','Entradas de Materia Prima')">🖶 Imprimir listado</button></div>
+      <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:10px;">Últimas entradas cargadas</h2>
+      <div class="recent-list" id="entradasRecientes"></div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: SALIDAS ============ -->
+  <div class="view" id="view-salida">
+    <div class="panel">
+      <div class="print-bar"><button class="print-btn" onclick="imprimirVista('view-salida','Registro de Salidas')">🖶 Imprimir</button></div>
+      <h2>Registrar salida</h2>
+      <div class="sub">Consumo de producción, descarte/ajuste o despacho directo desde Transbordo.</div>
+
+      <div class="form-row three">
+        <div class="field"><label>Fecha</label><input type="date" id="salFecha"></div>
+        <div class="field"><label>Turno</label>
+          <select id="salTurno"><option>Mañana</option><option>Tarde</option><option selected>Noche</option></select>
+        </div>
+        <div class="field"><label>Tipo de salida</label>
+          <select id="salTipo">
+            <option value="produccion">Producción</option>
+            <option value="descarte">Descarte / Ajuste</option>
+            <option value="despacho">Despacho directo (Transbordo)</option>
+          </select>
+        </div>
+      </div>
+
+      <h3 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:18px 0 10px;">Cantidad por materia prima (este turno)</h3>
+      <table class="simple" id="tablaSalidas"></table>
+
+      <div class="form-row" style="margin-top:14px;">
+        <div class="field" style="grid-column:1/-1;"><label>Nota / motivo (opcional, recomendado para Descarte)</label><input type="text" id="salNota" placeholder="Ej: material apelmazado en silo 11"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="limpiarSalidas()">Limpiar</button>
+        <button class="btn primary" onclick="guardarSalidas()">Guardar salidas del turno</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: TOMA FÍSICA ============ -->
+  <div class="view" id="view-toma">
+    <div class="panel">
+      <div class="print-bar"><button class="print-btn" onclick="imprimirVista('view-toma','Toma de Stock Físico')">🖶 Imprimir planilla</button></div>
+      <h2>Toma de stock físico</h2>
+      <div class="sub">Lo que el operario estima a ojo en cada silo, al cierre del turno.</div>
+
+      <div class="form-row three">
+        <div class="field"><label>Fecha</label><input type="date" id="tomaFecha"></div>
+        <div class="field"><label>Turno</label>
+          <select id="tomaTurno"><option>Mañana</option><option>Tarde</option><option selected>Noche</option></select>
+        </div>
+        <div class="field"><label>Responsable</label><input type="text" id="tomaResponsable" placeholder="Ej: Parra"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="field" style="flex-direction:row; align-items:center; gap:10px; display:flex;">
+          <input type="checkbox" id="tomaSinActividad" style="width:auto;" onchange="toggleSinActividad()">
+          <label style="margin:0;">Marcar este turno como "Sin actividad"</label>
+        </div>
+      </div>
+
+      <div id="tomaTablaWrap">
+        <h3 style="font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:14px 0 10px;">Stock estimado por silo</h3>
+        <table class="simple" id="tablaToma"></table>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" onclick="guardarToma()">Confirmar toma de stock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: HISTORIAL ============ -->
+  <div class="view" id="view-historial">
+    <div class="panel">
+      <h2>Historial</h2>
+      <div class="sub">Navegación por año / mes. Cada turno queda como registro fijo e independiente.</div>
+      <div class="form-row three">
+        <div class="field"><label>Año</label><select id="histAnio"></select></div>
+        <div class="field"><label>Mes</label><select id="histMes"></select></div>
+        <div class="field"><label>Silo (opcional)</label><select id="histSilo"><option value="">Todos</option></select></div>
+      </div>
+      <div class="actions"><button class="btn primary" onclick="cargarHistorial()">Buscar</button></div>
+    </div>
+    <div class="panel" id="histResultados">
+      <div class="empty-state">Elegí año y mes, y tocá "Buscar".</div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: ESTADÍSTICAS ============ -->
+  <div class="view" id="view-estadisticas">
+    <div class="panel">
+      <h2>Estadísticas mensuales</h2>
+      <div class="sub">Totales de entradas y salidas, y diferencia promedio por silo.</div>
+      <div class="form-row">
+        <div class="field"><label>Año</label><select id="estAnio"></select></div>
+        <div class="field"><label>Mes</label><select id="estMes"></select></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" onclick="cargarEstadisticas()">Calcular</button>
+        <button class="btn" onclick="imprimirVista('view-estadisticas','Estadísticas Mensuales')">🖶 Imprimir / PDF</button>
+      </div>
+    </div>
+    <div class="panel" id="estResultados">
+      <div class="empty-state">Elegí año y mes, y tocá "Calcular".</div>
+    </div>
+  </div>
+
+  <!-- ============ VISTA: CONFIGURACIÓN ============ -->
+  <div class="view" id="view-config">
+    <div class="panel">
+      <h2>Configuración general</h2>
+      <div class="form-row">
+        <div class="field"><label>Umbral de alerta general (%)</label><input type="number" id="cfgUmbralGeneral" value="10"></div>
+      </div>
+      <div class="actions"><button class="btn primary" onclick="guardarConfigGeneral()">Guardar</button></div>
+    </div>
+    <div class="panel">
+      <h2>Configuración por silo</h2>
+      <div class="sub">Umbral individual y activación de alertas por silo.</div>
+      <div id="configSilos"></div>
+      <div class="actions"><button class="btn primary" onclick="guardarConfigSilos()">Guardar cambios</button></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal de detalle de silo -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal" id="detailModal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+/* ======================================================================
+   CONFIGURACIÓN FIREBASE
+   ====================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyD3oZlB_qwKw0yYyem0ldjnJWj0bZz57jU",
+  authDomain: "planilla-viajes-2026.firebaseapp.com",
+  databaseURL: "https://planilla-viajes-2026-default-rtdb.firebaseio.com",
+  projectId: "planilla-viajes-2026",
+  storageBucket: "planilla-viajes-2026.firebasestorage.app",
+  messagingSenderId: "943742793691",
+  appId: "1:943742793691:web:f2c863b10deae4e20919fe",
+  measurementId: "G-0LL3QG6C5M"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const REF_BASE = "stock_planta/a2026"; // mismo proyecto, rama separada para no chocar con viajes
+
+/* ======================================================================
+   DEFINICIÓN MAESTRA DE SILOS (unidades de stock)
+   id: clave interna (sin caracteres especiales de Firebase)
+   ====================================================================== */
+const SILOS = [
+  { id:"molido",     nombre:"Afrechillo Molido",      sub:"Silos 13+14 (unificado)",  cap:90,  stockInicial:55 },
+  { id:"pellet",      nombre:"Afrechillo Pelleteado",  sub:"Silo 9",                   cap:90,  stockInicial:88 },
+  { id:"cascara",     nombre:"Cáscara de Soja",        sub:"Silo 10",                  cap:90,  stockInicial:55 },
+  { id:"transb1",     nombre:"Afrechillo Pelleteado",  sub:"Transbordo 1",             cap:50,  stockInicial:0  },
+  { id:"barrido",     nombre:"Barrido / Mix",          sub:"Silo 4",                   cap:50,  stockInicial:30 },
+  { id:"expplanta",   nombre:"Expeller de Soja",       sub:"Silo 12 — Planta",         cap:90,  stockInicial:65 },
+  { id:"expcarga",    nombre:"Expeller de Soja",       sub:"Transbordo 2 — Carga",     cap:75,  stockInicial:15 },
+  { id:"harina",      nombre:"Harina de Soja",         sub:"Silo 8",                   cap:90,  stockInicial:85 },
+  { id:"smfeed",      nombre:"SM. Feed",               sub:"Silo 7",                   cap:50,  stockInicial:14 },
+  { id:"girasol",     nombre:"Girasol",                sub:"Silo 11",                  cap:90,  stockInicial:35 },
+  { id:"alfalfa",     nombre:"Alfalfa",                sub:"Silo 6",                   cap:50,  stockInicial:0  },
+  { id:"subproducto", nombre:"Subproducto",            sub:"Silo 2",                   cap:40,  stockInicial:13 },
+  { id:"maiz1b",      nombre:"Maíz",                   sub:"Silo 1B",                  cap:330, stockInicial:310, grupo:"maiz" },
+  { id:"maiz2a",      nombre:"Maíz",                   sub:"Silo 2A",                  cap:330, stockInicial:100, grupo:"maiz" },
+  { id:"maiz5",       nombre:"Maíz",                   sub:"Silo 5",                   cap:100, stockInicial:68,  grupo:"maiz" },
+];
+// Fecha de stock inicial (cierre día 17/06/2026, arranque turno Noche 18/06/2026)
+const FECHA_STOCK_INICIAL = "2026-06-17";
+const TURNO_STOCK_INICIAL = "Tarde";
+
+function siloById(id){ return SILOS.find(s=>s.id===id); }
+
+/* ======================================================================
+   UTILIDADES FIREBASE KEY ENCODING
+   (igual convención que Planilla de Viajes: / . # $ [ ] deben codificarse)
+   ====================================================================== */
+function encodeKey(k){
+  return String(k).replace(/\//g,"__").replace(/\./g,"--").replace(/#/g,"~~").replace(/\$/g,"~d~").replace(/\[/g,"~o~").replace(/\]/g,"~c~");
+}
+
+/* ======================================================================
+   ESTADO LOCAL EN MEMORIA
+   ====================================================================== */
+let STATE = {
+  movimientos: {},   // todos los movimientos (entradas/salidas) por id
+  tomas: {},         // todas las tomas físicas por id
+  config: { umbralGeneral: 10, silos: {} } // config por silo: {umbral, alertasActivas}
+};
+
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(()=>{ t.className='toast'; }, 2600);
+}
+
+/* ======================================================================
+   CONEXIÓN
+   ====================================================================== */
+db.ref(".info/connected").on("value", (snap)=>{
+  const el = document.getElementById('connStatus');
+  if (snap.val() === true){ el.textContent = "Conectado"; el.className = "conn-status on"; }
+  else { el.textContent = "Sin conexión"; el.className = "conn-status off"; }
+});
+
+/* ======================================================================
+   CARGA INICIAL: escuchar movimientos, tomas y config en tiempo real
+   ====================================================================== */
+db.ref(`${REF_BASE}/movimientos`).on("value", (snap)=>{
+  STATE.movimientos = snap.val() || {};
+  recalcularTodo();
+});
+db.ref(`${REF_BASE}/tomas`).on("value", (snap)=>{
+  STATE.tomas = snap.val() || {};
+  recalcularTodo();
+});
+db.ref(`${REF_BASE}/config`).on("value", (snap)=>{
+  const v = snap.val();
+  if (v){ STATE.config = v; }
+  renderConfigPanel();
+  recalcularTodo();
+});
+
+/* ======================================================================
+   INICIALIZACIÓN: si no existe stock inicial en Firebase todavía, lo escribimos
+   ====================================================================== */
+function inicializarStockSiNecesario(){
+  db.ref(`${REF_BASE}/inicializado`).once("value").then(snap=>{
+    if (snap.val() === true) return; // ya está inicializado, no tocar nada
+    const updates = {};
+    SILOS.forEach(s=>{
+      const movId = `init_${s.id}`;
+      updates[`${REF_BASE}/movimientos/${movId}`] = {
+        tipo: "stock_inicial",
+        siloId: s.id,
+        kg: Math.round(s.stockInicial * 1000),
+        fecha: FECHA_STOCK_INICIAL,
+        turno: TURNO_STOCK_INICIAL,
+        nota: "Carga inicial del sistema",
+        ts: new Date(FECHA_STOCK_INICIAL + "T23:00:00").getTime()
+      };
+      updates[`${REF_BASE}/config/silos/${s.id}`] = { umbral: 10, alertasActivas: true };
+    });
+    updates[`${REF_BASE}/config/umbralGeneral`] = 10;
+    updates[`${REF_BASE}/inicializado`] = true;
+    db.ref().update(updates).then(()=>{
+      toast("Stock inicial cargado correctamente");
+    }).catch(err=>{
+      console.error(err);
+      toast("Error al inicializar stock", true);
+    });
+  });
+}
+inicializarStockSiNecesario();
+
+/* ======================================================================
+   TABS / NAVEGACIÓN
+   ====================================================================== */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-' + tab.dataset.view).classList.add('active');
+  });
+});
+
+/* Placeholder: el resto de las funciones (recalcularTodo, render de cada vista,
+   guardarEntrada, guardarSalidas, guardarToma, detalle de silo, historial,
+   estadísticas y configuración) se agregan en la siguiente parte del archivo. */
+
+/* ======================================================================
+   CÁLCULO DE STOCK TEÓRICO POR SILO (suma de todos los movimientos)
+   ====================================================================== */
+function calcularTeoricoKg(siloId){
+  let total = 0;
+  Object.values(STATE.movimientos).forEach(m=>{
+    if (m.siloId !== siloId) return;
+    if (m.tipo === "stock_inicial" || m.tipo === "entrada_compra" || m.tipo === "entrada_propia"){
+      total += Number(m.kg)||0;
+    } else if (m.tipo === "salida_produccion" || m.tipo === "salida_descarte" || m.tipo === "salida_despacho"){
+      total -= Number(m.kg)||0;
+    } else if (m.tipo === "correccion"){
+      total = Number(m.kgResultante)||0;
+    }
+  });
+  return total;
+}
+
+// Devuelve la última toma física registrada para un silo, ordenada por fecha+turno
+function ultimaTomaFisica(siloId){
+  const tomasDelSilo = Object.entries(STATE.tomas)
+    .filter(([id,t]) => t.valores && t.valores[siloId] !== undefined)
+    .map(([id,t]) => ({ id, ...t }))
+    .sort((a,b) => (b.ts||0) - (a.ts||0));
+  return tomasDelSilo[0] || null;
+}
+
+function turnoOrden(t){ return {"Mañana":0,"Tarde":1,"Noche":2}[t] ?? 0; }
+function tsFromFechaTurno(fecha, turno){
+  const horas = {"Mañana":7, "Tarde":15, "Noche":23};
+  return new Date(fecha + "T" + String(horas[turno]||0).padStart(2,"0") + ":00:00").getTime();
+}
+
+/* ======================================================================
+   AGRUPACIÓN VISUAL: algunos silos se agrupan (Maíz) para mostrar como
+   una sola unidad en el panel general, aunque se calculen individualmente.
+   ====================================================================== */
+function unidadesDeStockAgrupadas(){
+  const grupos = {};
+  const sueltos = [];
+  SILOS.forEach(s=>{
+    if (s.grupo){
+      if (!grupos[s.grupo]) grupos[s.grupo] = [];
+      grupos[s.grupo].push(s);
+    } else {
+      sueltos.push(s);
+    }
+  });
+  const unidades = [];
+  sueltos.forEach(s=> unidades.push({ id:s.id, nombre:s.nombre, sub:s.sub, cap:s.cap, silosIds:[s.id] }));
+  Object.entries(grupos).forEach(([gid, silos])=>{
+    const cap = silos.reduce((a,s)=>a+s.cap,0);
+    unidades.push({
+      id: gid,
+      nombre: silos[0].nombre,
+      sub: silos.map(s=>s.sub.replace(/^Silo /,'')).join(" + ") + " (unificado)",
+      cap, silosIds: silos.map(s=>s.id)
+    });
+  });
+  return unidades;
+}
+
+function datosUnidad(u){
+  const teoricoKg = u.silosIds.reduce((a,id)=>a + calcularTeoricoKg(id), 0);
+  // física: sumamos la última toma de cada silo del grupo (si todas existen)
+  let fisicaKg = 0, hayFisica = true, fechaMasReciente = null, sinActividad = false;
+  u.silosIds.forEach(id=>{
+    const t = ultimaTomaFisica(id);
+    if (!t){ hayFisica = false; return; }
+    fisicaKg += Number(t.valores[id])||0;
+    if (!fechaMasReciente || t.ts > fechaMasReciente.ts) fechaMasReciente = t;
+  });
+  const teoricoTn = teoricoKg/1000;
+  const fisicaTn = hayFisica ? fisicaKg/1000 : null;
+  const diffTn = hayFisica ? (fisicaTn - teoricoTn) : null;
+  const diffPct = hayFisica && teoricoTn !== 0 ? (diffTn/teoricoTn*100) : (hayFisica && diffTn===0 ? 0 : null);
+
+  const cfg = STATE.config.silos && STATE.config.silos[u.id] ? STATE.config.silos[u.id] : { umbral: STATE.config.umbralGeneral||10, alertasActivas:true };
+  const umbral = cfg.umbral!=null ? cfg.umbral : (STATE.config.umbralGeneral||10);
+  const alertasActivas = cfg.alertasActivas !== false;
+
+  let estado = "ok";
+  if (!hayFisica) estado = "pendiente";
+  else if (Math.abs(diffPct) > umbral) estado = "alerta";
+  else if (Math.abs(diffPct) > umbral*0.6) estado = "atencion";
+
+  const ocupTn = hayFisica ? fisicaTn : teoricoTn;
+  const ocupPct = u.cap > 0 ? Math.min(999, (ocupTn/u.cap*100)) : 0;
+  const excedeCapacidad = teoricoTn > u.cap * 1.1;
+
+  return { ...u, teoricoTn, fisicaTn, diffTn, diffPct, estado, alertasActivas, umbral, ocupPct, excedeCapacidad, hayFisica };
+}
+
+/* ======================================================================
+   RENDER: PANEL DE STOCK
+   ====================================================================== */
+function recalcularTodo(){
+  renderPanelStock();
+  renderEntradasRecientes();
+  renderTablaSalidas();
+  renderTablaToma();
+  renderConfigPanel();
+  poblarSelectoresEntrada();
+}
+
+function fmtTn(n){ return (Math.round(n*10)/10).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}); }
+function fmtPct(n){ return (Math.round(n*10)/10).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}); }
+
+function renderPanelStock(){
+  const unidades = unidadesDeStockAgrupadas().map(datosUnidad);
+  const list = document.getElementById('stockList');
+  list.innerHTML = "";
+
+  let nAlert=0, nOk=0, nPend=0;
+  unidades.forEach(u=>{
+    if (u.estado === "pendiente") nPend++;
+    else if (u.estado === "alerta" && u.alertasActivas) nAlert++;
+    else nOk++;
+
+    const row = document.createElement('div');
+    row.className = 'stock-row';
+    row.onclick = ()=> abrirDetalleSilo(u.id);
+
+    const flagClass = u.estado === "pendiente" ? "warn" : (u.estado==="alerta" && u.alertasActivas ? "bad" : (u.estado==="atencion" ? "warn" : "ok"));
+    const occFillClass = u.excedeCapacidad ? "bad" : (u.ocupPct>90?"warn":"ok");
+
+    let pillHtml = "";
+    if (u.estado === "pendiente"){
+      pillHtml = `<span class="pill warn"><span class="dot"></span>Sin toma</span>`;
+    } else if (u.estado === "alerta" && !u.alertasActivas){
+      pillHtml = `<span class="pill ok"><span class="dot"></span>Sin alerta (config)</span>`;
+    } else if (u.estado === "alerta"){
+      pillHtml = `<span class="pill bad"><span class="dot"></span>Alerta</span>`;
+    } else if (u.estado === "atencion"){
+      pillHtml = `<span class="pill warn"><span class="dot"></span>Atención</span>`;
+    } else {
+      pillHtml = `<span class="pill ok"><span class="dot"></span>OK</span>`;
+    }
+
+    const fisHtml = u.hayFisica
+      ? `<div class="fis-label">Físico</div><div class="fis-val">${fmtTn(u.fisicaTn)} tn</div>`
+      : `<div class="fis-label">Físico</div><div class="fis-val sintoma">Sin toma</div>`;
+
+    row.innerHTML = `
+      <span class="row-flag ${flagClass}"></span>
+      <div class="name">${u.nombre}<span class="sub">${u.sub}</span></div>
+      <div class="occ-block">
+        <div class="occ-top"><span class="tn">${fmtTn(u.ocupTn!==undefined?u.ocupTn:(u.hayFisica?u.fisicaTn:u.teoricoTn))} tn</span><span class="cap">/ ${u.cap} tn</span></div>
+        <div class="occ-track"><div class="occ-fill ${occFillClass}" style="width:${Math.min(100,u.ocupPct)}%"></div></div>
+        <div class="occ-pct">${fmtPct(u.ocupPct)}% ${u.excedeCapacidad?'⚠ excede':''}</div>
+      </div>
+      <div></div>
+      <div class="fis-block">${fisHtml}</div>
+    `;
+    // pill se agrega aparte para mantener el grid simple en mobile
+    const pillWrap = document.createElement('div');
+    pillWrap.style.gridColumn = "2 / -1";
+    pillWrap.style.marginTop = "4px";
+    pillWrap.innerHTML = pillHtml;
+    row.appendChild(pillWrap);
+
+    list.appendChild(row);
+  });
+
+  document.getElementById('sumTotal').textContent = unidades.length;
+  document.getElementById('sumAlert').textContent = nAlert;
+  document.getElementById('sumOk').textContent = nOk;
+  document.getElementById('sumPend').textContent = nPend;
+
+  const badge = document.getElementById('badgeAlert');
+  if (nAlert>0){ badge.style.display='flex'; badge.textContent = nAlert; } else { badge.style.display='none'; }
+}
+
+/* ======================================================================
+   DETALLE DE SILO (modal)
+   ====================================================================== */
+function abrirDetalleSilo(unidadId){
+  const u = datosUnidad(unidadesDeStockAgrupadas().find(x=>x.id===unidadId));
+  const modal = document.getElementById('detailModal');
+  modal.className = 'modal' + (u.estado==='alerta' && u.alertasActivas ? ' crit' : '');
+
+  // armar línea de cálculo (sumando movimientos de todos los silos del grupo)
+  let entradas=0, salidas=0, anterior=0;
+  u.silosIds.forEach(id=>{
+    Object.values(STATE.movimientos).forEach(m=>{
+      if (m.siloId!==id) return;
+      if (m.tipo==="stock_inicial") anterior += Number(m.kg)||0;
+      else if (m.tipo==="entrada_compra"||m.tipo==="entrada_propia") entradas += Number(m.kg)||0;
+      else if (m.tipo==="salida_produccion"||m.tipo==="salida_descarte"||m.tipo==="salida_despacho") salidas += Number(m.kg)||0;
+    });
+  });
+
+  // historial combinado de movimientos + tomas, de los silos del grupo, recientes primero
+  const histMovs = Object.entries(STATE.movimientos)
+    .filter(([id,m])=>u.silosIds.includes(m.siloId))
+    .map(([id,m])=>({...m, _id:id, _kind:'mov'}));
+  const histTomas = Object.entries(STATE.tomas)
+    .filter(([id,t])=>u.silosIds.some(sid=>t.valores && t.valores[sid]!==undefined))
+    .map(([id,t])=>({...t, _id:id, _kind:'toma'}));
+  const histAll = [...histMovs, ...histTomas].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,12);
+
+  const histHtml = histAll.map(h=>{
+    const fecha = h.fecha ? new Date(h.fecha+"T00:00:00").toLocaleDateString('es-AR') : "";
+    if (h._kind === 'toma'){
+      const kgVal = u.silosIds.reduce((a,sid)=> a + (h.valores[sid]!==undefined? Number(h.valores[sid]):0), 0);
+      return `<div class="hist-item"><div class="date">${fecha}<br>${h.turno||''}</div><div>Toma física: <b>${fmtTn(kgVal/1000)} tn</b> — resp: ${h.responsable||'—'}</div></div>`;
+    }
+    const tipoLabel = {
+      stock_inicial:"Stock inicial", entrada_compra:"Entrada (compra)", entrada_propia:"Entrada (producción propia)",
+      salida_produccion:"Salida (producción)", salida_descarte:"Salida (descarte/ajuste)", salida_despacho:"Salida (despacho directo)",
+      correccion:"Corrección / recalibración"
+    }[h.tipo] || h.tipo;
+    const signo = (h.tipo||"").startsWith("entrada")||h.tipo==="stock_inicial" ? "+" : (h.tipo==="correccion"?"→":"−");
+    const valor = h.tipo==="correccion" ? fmtTn((h.kgResultante||0)/1000) : fmtTn((h.kg||0)/1000);
+    return `<div class="hist-item"><div class="date">${fecha}<br>${h.turno||''}</div><div>${tipoLabel}: <b>${signo}${valor} tn</b>${h.nota?'<br><span style="color:var(--muted);font-size:11px">'+h.nota+'</span>':''}</div></div>`;
+  }).join("") || `<div class="empty-state">Sin movimientos registrados.</div>`;
+
+  modal.innerHTML = `
+    <span class="modal-close" onclick="cerrarDetalle()">×</span>
+    <h3>${u.nombre}</h3>
+    <div class="meta">${u.sub} ${u.estado==='alerta'?' · DIFERENCIA CRÍTICA':''}</div>
+
+    <div class="detail-grid">
+      <div class="box"><div class="l">Teórico</div><div class="v">${fmtTn(u.teoricoTn)} tn</div></div>
+      <div class="box"><div class="l">Físico</div><div class="v">${u.hayFisica?fmtTn(u.fisicaTn)+' tn':'—'}</div></div>
+      <div class="box diff"><div class="l">Diferencia</div><div class="v">${u.diffTn!=null? (u.diffTn>=0?'+':'')+fmtTn(u.diffTn)+' tn':'—'} ${u.diffPct!=null?'('+fmtPct(Math.abs(u.diffPct))+'%)':''}</div></div>
+    </div>
+
+    <div class="calc-line">Stock inicial/anterior <b>${fmtTn(anterior/1000)} tn</b> + Entradas <b>${fmtTn(entradas/1000)} tn</b> − Salidas <b>${fmtTn(salidas/1000)} tn</b> = Teórico <b>${fmtTn(u.teoricoTn)} tn</b></div>
+
+    <div class="actions" style="margin-bottom:18px;">
+      ${u.hayFisica ? `<button class="btn primary" onclick="recalibrarSilo('${u.id}', ${u.fisicaTn})">Confirmar físico y recalibrar a ${fmtTn(u.fisicaTn)} tn</button>` : ''}
+      <button class="btn" onclick="cerrarDetalle()">Cerrar</button>
+    </div>
+
+    <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:10px;">Historial reciente</h3>
+    ${histHtml}
+  `;
+  document.getElementById('detailOverlay').classList.add('active');
+}
+function cerrarDetalle(){ document.getElementById('detailOverlay').classList.remove('active'); }
+
+function recalibrarSilo(unidadId, fisicaTn){
+  const u = unidadesDeStockAgrupadas().find(x=>x.id===unidadId);
+  // Si es un grupo (ej. maiz) con varios silos físicos, recalibramos proporcionalmente
+  // al peso teórico actual de cada silo dentro del grupo. Si es 1 solo silo, directo.
+  const updates = {};
+  const ts = Date.now();
+  if (u.silosIds.length === 1){
+    const id = u.silosIds[0];
+    const movId = `corr_${id}_${ts}`;
+    updates[`${REF_BASE}/movimientos/${movId}`] = {
+      tipo:"correccion", siloId:id, kgResultante: Math.round(fisicaTn*1000),
+      fecha: new Date().toISOString().slice(0,10), turno: turnoActualEstimado(),
+      nota:"Recalibrado a partir de toma física", ts
+    };
+  } else {
+    const totalTeorico = u.silosIds.reduce((a,id)=>a+calcularTeoricoKg(id),0) || 1;
+    u.silosIds.forEach(id=>{
+      const propio = calcularTeoricoKg(id);
+      const proporcion = propio/totalTeorico;
+      const nuevoKg = Math.round(fisicaTn*1000*proporcion);
+      const movId = `corr_${id}_${ts}`;
+      updates[`${REF_BASE}/movimientos/${movId}`] = {
+        tipo:"correccion", siloId:id, kgResultante: nuevoKg,
+        fecha: new Date().toISOString().slice(0,10), turno: turnoActualEstimado(),
+        nota:"Recalibrado proporcionalmente a partir de toma física grupal", ts
+      };
+    });
+  }
+  db.ref().update(updates).then(()=>{ toast("Stock recalibrado"); cerrarDetalle(); }).catch(e=>{ console.error(e); toast("Error al recalibrar",true); });
+}
+function turnoActualEstimado(){
+  const h = new Date().getHours();
+  if (h>=7 && h<15) return "Mañana";
+  if (h>=15 && h<23) return "Tarde";
+  return "Noche";
+}
+
+/* ======================================================================
+   ENTRADAS
+   ====================================================================== */
+function poblarSelectoresEntrada(){
+  const sel = document.getElementById('entSilo');
+  if (sel.options.length>0) return; // ya poblado, evitar refresh constante
+  unidadesDeStockAgrupadas().forEach(u=>{
+    const opt = document.createElement('option');
+    opt.value = u.silosIds.length===1 ? u.silosIds[0] : u.silosIds[0]; // por defecto primer silo del grupo; el operario puede no necesitar elegir cuál
+    opt.textContent = `${u.nombre} — ${u.sub}`;
+    opt.dataset.grupo = u.id;
+    sel.appendChild(opt);
+  });
+  // también poblar histSilo
+  const histSel = document.getElementById('histSilo');
+  unidadesDeStockAgrupadas().forEach(u=>{
+    const opt = document.createElement('option');
+    opt.value = u.id; opt.textContent = `${u.nombre} — ${u.sub}`;
+    histSel.appendChild(opt);
+  });
+  // fechas por defecto: hoy
+  const hoy = new Date().toISOString().slice(0,10);
+  ['entFecha','salFecha','tomaFecha'].forEach(id=>{ const el=document.getElementById(id); if(el && !el.value) el.value = hoy; });
+  const ahora = new Date().toTimeString().slice(0,5);
+  const hEl = document.getElementById('entHora'); if (hEl && !hEl.value) hEl.value = ahora;
+}
+
+function toggleOrigenEntrada(){
+  const esCompra = document.getElementById('entOrigen').value === 'compra';
+  document.getElementById('entCompraFields').style.display = esCompra ? 'grid' : 'none';
+}
+
+function limpiarEntrada(){
+  document.getElementById('entTransporte').value='';
+  document.getElementById('entChofer').value='';
+  document.getElementById('entRemito').value='';
+  document.getElementById('entKg').value='';
+}
+
+function guardarEntrada(){
+  const fecha = document.getElementById('entFecha').value;
+  const turno = document.getElementById('entTurno').value;
+  const origen = document.getElementById('entOrigen').value;
+  const siloId = document.getElementById('entSilo').value;
+  const kg = Number(document.getElementById('entKg').value);
+  const hora = document.getElementById('entHora').value;
+
+  if (!fecha || !siloId || !kg || kg<=0){ toast("Completá fecha, silo y kilos", true); return; }
+
+  const ts = tsFromFechaTurno(fecha,turno) + (hora? (parseInt(hora.split(':')[0])*3600000+parseInt(hora.split(':')[1])*60000) : 0);
+  const movId = `ent_${Date.now()}`;
+  const data = {
+    tipo: origen==='compra' ? "entrada_compra" : "entrada_propia",
+    siloId, kg, fecha, turno, hora, ts
+  };
+  if (origen==='compra'){
+    data.transporte = document.getElementById('entTransporte').value;
+    data.chofer = document.getElementById('entChofer').value;
+    data.remito = document.getElementById('entRemito').value;
+  }
+  db.ref(`${REF_BASE}/movimientos/${movId}`).set(data).then(()=>{
+    toast("Entrada guardada");
+    limpiarEntrada();
+  }).catch(e=>{ console.error(e); toast("Error al guardar", true); });
+}
+
+function renderEntradasRecientes(){
+  const wrap = document.getElementById('entradasRecientes');
+  const entradas = Object.entries(STATE.movimientos)
+    .filter(([id,m])=>m.tipo==='entrada_compra'||m.tipo==='entrada_propia')
+    .map(([id,m])=>({id,...m}))
+    .sort((a,b)=>(b.ts||0)-(a.ts||0))
+    .slice(0,10);
+  if (entradas.length===0){ wrap.innerHTML = `<div class="empty-state">Todavía no hay entradas cargadas.</div>`; return; }
+  wrap.innerHTML = entradas.map(e=>{
+    const s = siloById(e.siloId);
+    const label = e.tipo==='entrada_propia' ? "Producción propia" : (e.transporte||'—');
+    return `<div class="recent-item">
+      <div class="time">${e.hora||''}</div>
+      <div>${label} — ${s?s.nombre:e.siloId} ${e.remito?('· Rem. '+e.remito):''}</div>
+      <div class="qty">${e.kg.toLocaleString('es-AR')} kg</div>
+      <div class="del" onclick="borrarMovimiento('${e.id}')">Borrar</div>
+    </div>`;
+  }).join("");
+}
+
+function borrarMovimiento(id){
+  if (!confirm("¿Eliminar este movimiento? Esta acción no se puede deshacer.")) return;
+  db.ref(`${REF_BASE}/movimientos/${id}`).remove().then(()=>toast("Movimiento eliminado")).catch(e=>{console.error(e);toast("Error al eliminar",true);});
+}
+
+/* ======================================================================
+   SALIDAS
+   ====================================================================== */
+// Mapeo de columnas de la planilla "Consumo Balanceados" a silos del sistema
+const COLUMNAS_SALIDA = [
+  { label:"Molido", siloId:"molido" },
+  { label:"Pellet (Afrechillo)", siloId:"pellet" },
+  { label:"Cáscara", siloId:"cascara" },
+  { label:"Mix / Barridos", siloId:"barrido" },
+  { label:"Expeller Soja — Planta", siloId:"expplanta" },
+  { label:"Harina de Soja", siloId:"harina" },
+  { label:"Smart Feed", siloId:"smfeed" },
+  { label:"Girasol", siloId:"girasol" },
+  { label:"Alfalfa", siloId:"alfalfa" },
+  { label:"Subproducto", siloId:"subproducto" },
+  { label:"Maíz", siloId:"maiz5" }, // consumo de maíz: se descuenta del grupo, ver guardarSalidas()
+];
+// Columnas específicas para despacho directo (transbordo)
+const COLUMNAS_DESPACHO = [
+  { label:"Afrechillo Pelleteado (Transbordo 1)", siloId:"transb1" },
+  { label:"Expeller de Soja (Transbordo 2 / Carga)", siloId:"expcarga" },
+];
+
+function renderTablaSalidas(){
+  const tabla = document.getElementById('tablaSalidas');
+  const tipo = document.getElementById('salTipo')?.value || 'produccion';
+  const cols = tipo === 'despacho' ? COLUMNAS_DESPACHO : COLUMNAS_SALIDA;
+  tabla.innerHTML = `<thead><tr><th>Materia prima</th><th style="text-align:right">Kilos</th></tr></thead><tbody>` +
+    cols.map(c=>`<tr><td>${c.label}</td><td style="text-align:right"><input type="number" data-silo="${c.siloId}" placeholder="0"></td></tr>`).join("") +
+    `</tbody>`;
+}
+document.getElementById('salTipo')?.addEventListener('change', renderTablaSalidas);
+
+function limpiarSalidas(){
+  document.querySelectorAll('#tablaSalidas input').forEach(i=>i.value='');
+  document.getElementById('salNota').value='';
+}
+
+function guardarSalidas(){
+  const fecha = document.getElementById('salFecha').value;
+  const turno = document.getElementById('salTurno').value;
+  const tipoSel = document.getElementById('salTipo').value;
+  const nota = document.getElementById('salNota').value;
+  if (!fecha){ toast("Completá la fecha", true); return; }
+
+  const tipoMov = tipoSel==='produccion' ? 'salida_produccion' : (tipoSel==='descarte' ? 'salida_descarte' : 'salida_despacho');
+  const inputs = document.querySelectorAll('#tablaSalidas input');
+  const updates = {};
+  let algunoCargado = false;
+  const ts = tsFromFechaTurno(fecha, turno);
+
+  inputs.forEach(inp=>{
+    const kg = Number(inp.value);
+    if (!kg || kg<=0) return;
+    algunoCargado = true;
+    const movId = `sal_${inp.dataset.silo}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    updates[`${REF_BASE}/movimientos/${movId}`] = { tipo: tipoMov, siloId: inp.dataset.silo, kg, fecha, turno, nota, ts };
+  });
+
+  if (!algunoCargado){ toast("Cargá al menos una cantidad", true); return; }
+
+  db.ref().update(updates).then(()=>{
+    toast("Salidas guardadas");
+    limpiarSalidas();
+  }).catch(e=>{ console.error(e); toast("Error al guardar", true); });
+}
+
+/* ======================================================================
+   TOMA DE STOCK FÍSICO
+   ====================================================================== */
+function renderTablaToma(){
+  const tabla = document.getElementById('tablaToma');
+  const unidades = unidadesDeStockAgrupadas();
+  tabla.innerHTML = `<thead><tr><th>Silo</th><th style="text-align:right">Stock anterior</th><th style="text-align:right">Stock físico (tn)</th></tr></thead><tbody>` +
+    unidades.map(u=>{
+      const teoricoTn = u.silosIds.reduce((a,id)=>a+calcularTeoricoKg(id),0)/1000;
+      // si es grupo, un solo input para el total combinado (no se puede distinguir por silo individual en muchos casos)
+      return `<tr>
+        <td>${u.nombre}<br><span style="color:var(--muted);font-size:11px">${u.sub}</span></td>
+        <td class="prev" style="text-align:right">${fmtTn(teoricoTn)}</td>
+        <td style="text-align:right"><input type="number" step="0.1" data-unidad="${u.id}" data-silos="${u.silosIds.join(',')}" placeholder="0,0"></td>
+      </tr>`;
+    }).join("") + `</tbody>`;
+}
+
+function toggleSinActividad(){
+  const chk = document.getElementById('tomaSinActividad').checked;
+  document.getElementById('tomaTablaWrap').style.display = chk ? 'none' : 'block';
+}
+
+function guardarToma(){
+  const fecha = document.getElementById('tomaFecha').value;
+  const turno = document.getElementById('tomaTurno').value;
+  const responsable = document.getElementById('tomaResponsable').value;
+  const sinActividad = document.getElementById('tomaSinActividad').checked;
+  if (!fecha){ toast("Completá la fecha", true); return; }
+
+  const ts = tsFromFechaTurno(fecha, turno);
+  const tomaId = `toma_${fecha}_${turno}_${Date.now()}`;
+
+  if (sinActividad){
+    db.ref(`${REF_BASE}/tomas/${tomaId}`).set({ fecha, turno, responsable: responsable||'—', sinActividad:true, valores:{}, ts })
+      .then(()=>{ toast("Turno marcado como sin actividad"); })
+      .catch(e=>{ console.error(e); toast("Error al guardar", true); });
+    return;
+  }
+
+  const inputs = document.querySelectorAll('#tablaToma input');
+  const valores = {};
+  let algunoCargado = false;
+  inputs.forEach(inp=>{
+    const tn = Number(inp.value);
+    if (inp.value === "" || isNaN(tn)) return;
+    algunoCargado = true;
+    const silos = inp.dataset.silos.split(',');
+    if (silos.length === 1){
+      valores[silos[0]] = Math.round(tn*1000);
+    } else {
+      // repartir proporcionalmente al teórico actual de cada silo del grupo
+      const totalTeorico = silos.reduce((a,id)=>a+calcularTeoricoKg(id),0) || 1;
+      silos.forEach(id=>{
+        const prop = calcularTeoricoKg(id)/totalTeorico;
+        valores[id] = Math.round(tn*1000*prop);
+      });
+    }
+  });
+
+  if (!responsable){ toast("Indicá el responsable de la toma", true); return; }
+  if (!algunoCargado){ toast("Cargá al menos un valor de stock físico", true); return; }
+
+  db.ref(`${REF_BASE}/tomas/${tomaId}`).set({ fecha, turno, responsable, sinActividad:false, valores, ts })
+    .then(()=>{ toast("Toma de stock confirmada"); })
+    .catch(e=>{ console.error(e); toast("Error al guardar", true); });
+}
+
+/* ======================================================================
+   HISTORIAL
+   ====================================================================== */
+function poblarSelectoresFecha(){
+  const anioSel = document.getElementById('histAnio');
+  const anioEstSel = document.getElementById('estAnio');
+  if (anioSel.options.length===0){
+    for (let y=2026; y<=2030; y++){
+      [anioSel, anioEstSel].forEach(sel=>{
+        const opt = document.createElement('option'); opt.value=y; opt.textContent=y; sel.appendChild(opt);
+      });
+    }
+  }
+  const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  [document.getElementById('histMes'), document.getElementById('estMes')].forEach(sel=>{
+    if (sel.options.length===0){
+      meses.forEach((m,i)=>{ const opt=document.createElement('option'); opt.value=i+1; opt.textContent=m; sel.appendChild(opt); });
+    }
+  });
+  const hoy = new Date();
+  document.getElementById('histAnio').value = hoy.getFullYear();
+  document.getElementById('histMes').value = hoy.getMonth()+1;
+  document.getElementById('estAnio').value = hoy.getFullYear();
+  document.getElementById('estMes').value = hoy.getMonth()+1;
+}
+poblarSelectoresFecha();
+
+function cargarHistorial(){
+  const anio = Number(document.getElementById('histAnio').value);
+  const mes = Number(document.getElementById('histMes').value);
+  const siloFiltro = document.getElementById('histSilo').value;
+  const wrap = document.getElementById('histResultados');
+  const printBarHtml = `<div class="print-bar"><button class="print-btn" onclick="imprimirVista('view-historial','Historial')">🖶 Imprimir</button></div>`;
+
+  const enMes = (fecha)=>{ if(!fecha) return false; const d=new Date(fecha+"T00:00:00"); return d.getFullYear()===anio && (d.getMonth()+1)===mes; };
+
+  const tomasDelMes = Object.entries(STATE.tomas)
+    .filter(([id,t])=>enMes(t.fecha))
+    .map(([id,t])=>({id,...t}))
+    .filter(t=> !siloFiltro || (t.valores && t.valores[siloFiltro]!==undefined) || t.sinActividad)
+    .sort((a,b)=>(a.ts||0)-(b.ts||0));
+
+  if (tomasDelMes.length===0){
+    wrap.innerHTML = `<div class="empty-state">No hay tomas registradas para ese período.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = printBarHtml + tomasDelMes.map(t=>{
+    const fechaFmt = new Date(t.fecha+"T00:00:00").toLocaleDateString('es-AR');
+    if (t.sinActividad){
+      return `<div class="hist-item"><div class="date">${fechaFmt}<br>${t.turno}</div><div><span class="pill warn"><span class="dot"></span>Sin actividad</span></div></div>`;
+    }
+    const detalle = Object.entries(t.valores).map(([sid,kg])=>{
+      const s = siloById(sid);
+      return `${s?s.nombre:sid}: <b>${fmtTn(kg/1000)} tn</b>`;
+    }).join(" · ");
+    return `<div class="hist-item"><div class="date">${fechaFmt}<br>${t.turno}</div><div>Resp: ${t.responsable}<br>${detalle}</div></div>`;
+  }).join("");
+}
+
+/* ======================================================================
+   ESTADÍSTICAS MENSUALES
+   ====================================================================== */
+function cargarEstadisticas(){
+  const anio = Number(document.getElementById('estAnio').value);
+  const mes = Number(document.getElementById('estMes').value);
+  const wrap = document.getElementById('estResultados');
+  const enMes = (fecha)=>{ if(!fecha) return false; const d=new Date(fecha+"T00:00:00"); return d.getFullYear()===anio && (d.getMonth()+1)===mes; };
+
+  const unidades = unidadesDeStockAgrupadas();
+  const filas = unidades.map(u=>{
+    let entradas=0, salidas=0;
+    Object.values(STATE.movimientos).forEach(m=>{
+      if (!u.silosIds.includes(m.siloId) || !enMes(m.fecha)) return;
+      if (m.tipo==='entrada_compra'||m.tipo==='entrada_propia') entradas += Number(m.kg)||0;
+      else if (m.tipo==='salida_produccion'||m.tipo==='salida_descarte'||m.tipo==='salida_despacho') salidas += Number(m.kg)||0;
+    });
+    // diferencia promedio del mes (sobre las tomas físicas del mes para este grupo)
+    const tomasMes = Object.values(STATE.tomas).filter(t=>enMes(t.fecha) && !t.sinActividad && u.silosIds.some(id=>t.valores&&t.valores[id]!==undefined));
+    let sumDiffPct=0, nDiff=0;
+    tomasMes.forEach(t=>{
+      const fisicaKg = u.silosIds.reduce((a,id)=>a+(t.valores[id]!==undefined?Number(t.valores[id]):0),0);
+      // teórico aproximado al momento de esa toma: usamos el teórico actual como referencia simplificada
+      const teoricoKg = u.silosIds.reduce((a,id)=>a+calcularTeoricoKg(id),0);
+      if (teoricoKg>0){ sumDiffPct += Math.abs((fisicaKg-teoricoKg)/teoricoKg*100); nDiff++; }
+    });
+    const diffProm = nDiff>0 ? sumDiffPct/nDiff : null;
+    return { nombre:u.nombre, sub:u.sub, entradas:entradas/1000, salidas:salidas/1000, diffProm };
+  });
+
+  const totalEnt = filas.reduce((a,f)=>a+f.entradas,0);
+  const totalSal = filas.reduce((a,f)=>a+f.salidas,0);
+
+  wrap.innerHTML = `
+    <table class="simple">
+      <thead><tr><th>Silo</th><th style="text-align:right">Entradas (tn)</th><th style="text-align:right">Salidas (tn)</th><th style="text-align:right">Dif. prom. mensual</th></tr></thead>
+      <tbody>
+        ${filas.map(f=>`<tr><td>${f.nombre}<br><span style="color:var(--muted);font-size:11px">${f.sub}</span></td><td style="text-align:right;font-family:var(--mono)">${fmtTn(f.entradas)}</td><td style="text-align:right;font-family:var(--mono)">${fmtTn(f.salidas)}</td><td style="text-align:right;font-family:var(--mono)">${f.diffProm!=null?fmtPct(f.diffProm)+'%':'—'}</td></tr>`).join("")}
+        <tr style="font-weight:700;background:var(--panel-2)"><td>TOTAL PLANTA</td><td style="text-align:right;font-family:var(--mono)">${fmtTn(totalEnt)}</td><td style="text-align:right;font-family:var(--mono)">${fmtTn(totalSal)}</td><td></td></tr>
+      </tbody>
+    </table>
+  `;
+}
+
+/* ======================================================================
+   CONFIGURACIÓN
+   ====================================================================== */
+function renderConfigPanel(){
+  const wrap = document.getElementById('configSilos');
+  if (!wrap) return;
+  const unidades = unidadesDeStockAgrupadas();
+  document.getElementById('cfgUmbralGeneral').value = STATE.config.umbralGeneral || 10;
+  wrap.innerHTML = unidades.map(u=>{
+    const cfg = (STATE.config.silos && STATE.config.silos[u.id]) || { umbral: STATE.config.umbralGeneral||10, alertasActivas:true };
+    return `<div class="config-row">
+      <div class="name">${u.nombre} <span style="color:var(--muted);font-size:11px;font-weight:400">(${u.sub})</span></div>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--muted)">Umbral %</span>
+          <input type="number" class="small-input" id="cfg_umbral_${u.id}" value="${cfg.umbral}">
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="cfg_alert_${u.id}" ${cfg.alertasActivas!==false?'checked':''}>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function guardarConfigGeneral(){
+  const v = Number(document.getElementById('cfgUmbralGeneral').value);
+  db.ref(`${REF_BASE}/config/umbralGeneral`).set(v).then(()=>toast("Umbral general guardado"));
+}
+
+function guardarConfigSilos(){
+  const unidades = unidadesDeStockAgrupadas();
+  const updates = {};
+  unidades.forEach(u=>{
+    const umbral = Number(document.getElementById(`cfg_umbral_${u.id}`).value);
+    const activas = document.getElementById(`cfg_alert_${u.id}`).checked;
+    updates[`${REF_BASE}/config/silos/${u.id}`] = { umbral, alertasActivas: activas };
+  });
+  db.ref().update(updates).then(()=>toast("Configuración guardada")).catch(e=>{console.error(e);toast("Error al guardar",true);});
+}
+
+/* ======================================================================
+   IMPRESIÓN
+   Marca la vista a imprimir con la clase "printing" (que el CSS de
+   @media print usa para decidir qué mostrar), inyecta un encabezado con
+   título + fecha/hora, imprime, y al volver limpia todo.
+   ====================================================================== */
+function imprimirVista(viewId, titulo){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('printing'));
+  const view = document.getElementById(viewId);
+  if (!view) return;
+  view.classList.add('printing');
+
+  // armar/insertar encabezado de impresión al principio de la vista
+  let header = view.querySelector('.print-header-injected');
+  if (!header){
+    header = document.createElement('div');
+    header.className = 'print-header print-header-injected';
+    view.insertBefore(header, view.firstChild);
+  }
+  const ahora = new Date();
+  const fechaStr = ahora.toLocaleDateString('es-AR');
+  const horaStr = ahora.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  header.innerHTML = `<strong>Plaza R-T Cooperativa — Planta Tandil</strong><br>${titulo}<br>Impreso: ${fechaStr} ${horaStr}`;
+
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ view.classList.remove('printing'); }, 300);
+  }, 50);
+}
+
+window.addEventListener('afterprint', ()=>{
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('printing'));
+});
+
+</script>
+
+</body>
+</html>
